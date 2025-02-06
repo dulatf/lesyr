@@ -1,0 +1,15 @@
+FROM golang:1.23.6-alpine
+
+WORKDIR /app
+
+RUN go install github.com/air-verse/air@latest
+
+# Install git and build dependencies
+RUN apk add --no-cache git build-base
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+CMD ["air", "-c", ".air.toml"]

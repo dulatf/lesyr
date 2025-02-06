@@ -1,0 +1,5 @@
+-- Remove test feeds
+DELETE FROM feeds WHERE user_id = '11111111-1111-1111-1111-111111111111';
+
+-- Remove test user
+DELETE FROM users WHERE id = '11111111-1111-1111-1111-111111111111';
