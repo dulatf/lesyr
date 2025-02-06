@@ -21,8 +21,14 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 		return nil, fmt.Errorf("failed to initialize database: %v", err)
 	}
 
+	// Load OAuth configuration
+	oauthConfig, err := config.LoadOAuthConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load OAuth config: %v", err)
+	}
+
 	// Initialize repositories
-	// userRepo := postgres.NewUserRepository(dbPool)
+	userRepo := postgres.NewUserRepository(dbPool)
 	feedRepo := postgres.NewFeedRepository(dbPool)
 	articleRepo := postgres.NewArticleRepository(dbPool)
 
@@ -30,6 +36,7 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 	feedFetcher := service.NewFeedFetcher(feedRepo, articleRepo)
 
 	// Handlers
+	authHandler := handler.NewAuthHandler(userRepo, oauthConfig, cfg.JWTSecret)
 	feedHandler := handler.NewFeedHandler(feedRepo, feedFetcher)
 	articleHandler := handler.NewArticleHandler(articleRepo, feedRepo)
 
@@ -54,12 +61,14 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 
 	// Auth routes
 	auth := v1.Group("/auth")
-	auth.Post("/register", handler.Register)
-	auth.Post("/login", handler.Login)
+	auth.Get("/github", authHandler.InitiateGitHubAuth)
+	auth.Get("/callback", authHandler.HandleGitHubCallback)
+
+	api := v1.Group("")
+	api.Use(authHandler.AuthMiddleware)
 
 	// Feed routes (protected)
-	feeds := v1.Group("/feeds")
-	feeds.Use(handler.AuthMiddleware)
+	feeds := api.Group("/feeds")
 	feeds.Get("/", feedHandler.ListFeeds)
 	feeds.Post("/", feedHandler.CreateFeed)
 	feeds.Get("/:id", feedHandler.GetFeed)
@@ -67,8 +76,7 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 	feeds.Post("/:id/refresh", feedHandler.RefreshFeed)
 
 	// Article routes (protected)
-	articles := v1.Group("/articles")
-	articles.Use(handler.AuthMiddleware)
+	articles := api.Group("/articles")
 	articles.Get("/unread", articleHandler.GetUnreadArticles)
 	articles.Get("/:id", articleHandler.GetArticle)
 	articles.Post("/:id/read", articleHandler.MarkArticleRead)

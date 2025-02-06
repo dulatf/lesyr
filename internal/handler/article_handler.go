@@ -66,10 +66,9 @@ func (h *ArticleHandler) GetArticle(c *fiber.Ctx) error {
 
 // MarkArticleRead marks an article as read for the current user
 func (h *ArticleHandler) MarkArticleRead(c *fiber.Ctx) error {
-	// TODO: Get real user ID from JWT token
-	userID, err := uuid.Parse("11111111-1111-1111-1111-111111111111")
+	userID, err := getCurrentUserID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Invalid user ID")
+		return err
 	}
 
 	articleID, err := uuid.Parse(c.Params("id"))
@@ -86,10 +85,9 @@ func (h *ArticleHandler) MarkArticleRead(c *fiber.Ctx) error {
 
 // GetUnreadArticles returns all unread articles for the current user
 func (h *ArticleHandler) GetUnreadArticles(c *fiber.Ctx) error {
-	// TODO: Get real user ID from JWT token
-	userID, err := uuid.Parse("11111111-1111-1111-1111-111111111111")
+	userID, err := getCurrentUserID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Invalid user ID")
+		return err
 	}
 
 	articles, err := h.articleRepo.GetUnreadByUserID(c.Context(), userID)

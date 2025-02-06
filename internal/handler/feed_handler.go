@@ -25,10 +25,9 @@ func NewFeedHandler(feedRepo repository.FeedRepository, feedFetcher *service.Fee
 
 // CreateFeed handles the creation of a new feed
 func (h *FeedHandler) CreateFeed(c *fiber.Ctx) error {
-	// TODO: Get real user ID from JWT token
-	userID, err := uuid.Parse("11111111-1111-1111-1111-111111111111")
+	userID, err := getCurrentUserID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Invalid user ID")
+		return err
 	}
 
 	feed := new(model.Feed)
@@ -84,10 +83,9 @@ func (h *FeedHandler) RefreshFeed(c *fiber.Ctx) error {
 
 // ListFeeds returns all feeds for the authenticated user
 func (h *FeedHandler) ListFeeds(c *fiber.Ctx) error {
-	// TODO: Get real user ID from JWT token
-	userID, err := uuid.Parse("11111111-1111-1111-1111-111111111111")
+	userID, err := getCurrentUserID(c)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "Invalid user ID")
+		return err
 	}
 
 	feeds, err := h.feedRepo.GetByUserID(c.Context(), userID)
