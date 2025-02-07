@@ -100,8 +100,8 @@ func (r *FeedRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*
 func (r *FeedRepository) Update(ctx context.Context, feed *model.Feed) error {
 	query := `
 		UPDATE feeds
-		SET url = $1, title = $2, description = $3, last_fetched_at = $4, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $5
+		SET url = $1, title = $2, description = $3, last_fetched_at = $4, last_error = $5, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $6
 		RETURNING updated_at`
 
 	return r.db.QueryRow(ctx, query,
@@ -109,6 +109,7 @@ func (r *FeedRepository) Update(ctx context.Context, feed *model.Feed) error {
 		feed.Title,
 		feed.Description,
 		feed.LastFetchedAt,
+		feed.LastError,
 		feed.ID,
 	).Scan(&feed.UpdatedAt)
 }
@@ -126,4 +127,39 @@ func (r *FeedRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (r *FeedRepository) GetAll(ctx context.Context) ([]*model.Feed, error) {
+	query := `
+		SELECT id, user_id, url, title, description, last_fetched_at, last_error, created_at, updated_at
+		FROM feeds
+		ORDER BY last_fetched_at ASC NULLS FIRST`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var feeds []*model.Feed
+	for rows.Next() {
+		feed := &model.Feed{}
+		err := rows.Scan(
+			&feed.ID,
+			&feed.UserID,
+			&feed.URL,
+			&feed.Title,
+			&feed.Description,
+			&feed.LastFetchedAt,
+			&feed.LastError,
+			&feed.CreatedAt,
+			&feed.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		feeds = append(feeds, feed)
+	}
+
+	return feeds, rows.Err()
 }

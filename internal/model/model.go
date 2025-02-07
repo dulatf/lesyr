@@ -22,6 +22,7 @@ type Feed struct {
 	Title         string     `json:"title"`
 	Description   string     `json:"description"`
 	LastFetchedAt *time.Time `json:"last_fetched_at"`
+	LastError     string     `json:"last_error,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 }

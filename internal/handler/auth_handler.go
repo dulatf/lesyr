@@ -30,10 +30,15 @@ func NewAuthHandler(userRepo repository.UserRepository, oauthConfig *config.OAut
 
 // InitiateGitHubAuth redirects to GitHub OAuth page
 func (h *AuthHandler) InitiateGitHubAuth(c *fiber.Ctx) error {
+	redirectURI := c.Query("redirect_uri")
+	if redirectURI == "" {
+		redirectURI = h.oauthConfig.AuthCallbackURL
+	}
+
 	url := fmt.Sprintf(
 		"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=user:email",
 		h.oauthConfig.GitHubClientID,
-		h.oauthConfig.AuthCallbackURL,
+		redirectURI,
 	)
 	return c.Redirect(url)
 }
@@ -75,10 +80,9 @@ func (h *AuthHandler) HandleGitHubCallback(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to generate token")
 	}
 
-	return c.JSON(fiber.Map{
-		"token": token,
-		"user":  user,
-	})
+	frontendURL := "http://localhost:3000/auth/callback"
+	redirectURL := fmt.Sprintf("%s?token=%s", frontendURL, token)
+	return c.Redirect(redirectURL)
 }
 
 // AuthMiddleware validates JWT tokens
@@ -181,4 +185,28 @@ func (h *AuthHandler) generateJWT(userID string) (string, error) {
 	})
 
 	return token.SignedString([]byte(h.jwtSecret))
+}
+
+type UserResponse struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatarUrl"`
+}
+
+func (h *AuthHandler) GetAuthenticatedUser(c *fiber.Ctx) error {
+	userID, err := getCurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	user, err := h.userRepo.GetByID(c.Context(), userID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to fetch user")
+	}
+	return c.JSON(UserResponse{
+		ID:        user.ID.String(),
+		Username:  user.Email,
+		Email:     user.Email,
+		AvatarURL: "",
+	})
 }

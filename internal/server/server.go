@@ -1,7 +1,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/dulatf/lesyr/internal/config"
 	"github.com/dulatf/lesyr/internal/database"
@@ -13,6 +16,28 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
+
+// Global scheduler for cleanup
+var (
+	scheduler     *service.FeedScheduler
+	shutdownOnce  sync.Once
+	shutdownHooks []func() error
+)
+
+// AddShutdownHook adds a function to be called on server shutdown
+func AddShutdownHook(fn func() error) {
+	shutdownHooks = append(shutdownHooks, fn)
+}
+
+func Cleanup() {
+	shutdownOnce.Do(func() {
+		for _, hook := range shutdownHooks {
+			if err := hook(); err != nil {
+				fmt.Printf("Error during shutdown: %v\n", err)
+			}
+		}
+	})
+}
 
 func NewServer(cfg *config.Config) (*fiber.App, error) {
 	// Initialize database connection
@@ -34,6 +59,25 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 
 	// Initialize handlers
 	feedFetcher := service.NewFeedFetcher(feedRepo, articleRepo)
+	feedScheduler := service.NewFeedScheduler(
+		feedRepo,
+		feedFetcher,
+		10,             // number of workers
+		15*time.Minute, // refresh interval
+	)
+
+	// Start the scheduler
+	if err := feedScheduler.Start(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to start feed scheduler: %v", err)
+	}
+
+	// Add cleanup hook for scheduler
+	AddShutdownHook(func() error {
+		if scheduler != nil {
+			scheduler.Stop()
+		}
+		return nil
+	})
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, oauthConfig, cfg.JWTSecret)
@@ -48,9 +92,10 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowOrigins:     "http://localhost:3000,http://localhost:8080",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowCredentials: true,
 	}))
 
 	// Health check
@@ -66,6 +111,10 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 
 	api := v1.Group("")
 	api.Use(authHandler.AuthMiddleware)
+
+	auth_me := auth.Group("")
+	auth_me.Use(authHandler.AuthMiddleware)
+	auth_me.Get("/me", authHandler.GetAuthenticatedUser)
 
 	// Feed routes (protected)
 	feeds := api.Group("/feeds")

@@ -32,6 +32,7 @@ type FeedRepository interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Feed, error)
 	Update(ctx context.Context, feed *model.Feed) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	GetAll(ctx context.Context) ([]*model.Feed, error)
 }
 
 type ArticleRepository interface {
