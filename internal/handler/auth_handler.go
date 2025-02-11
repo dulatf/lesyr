@@ -69,6 +69,8 @@ func (h *AuthHandler) HandleGitHubCallback(c *fiber.Ctx) error {
 		githubUser.Email,
 		"github",
 		fmt.Sprintf("%d", githubUser.ID),
+		githubUser.Name,
+		githubUser.AvatarURL,
 	)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to create/update user")
@@ -205,8 +207,8 @@ func (h *AuthHandler) GetAuthenticatedUser(c *fiber.Ctx) error {
 	}
 	return c.JSON(UserResponse{
 		ID:        user.ID.String(),
-		Username:  user.Email,
+		Username:  user.Name,
 		Email:     user.Email,
-		AvatarURL: "",
+		AvatarURL: user.AvatarURL,
 	})
 }

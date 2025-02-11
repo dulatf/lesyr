@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/dulatf/lesyr/internal/model"
 	"github.com/google/uuid"
@@ -19,27 +20,30 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) CreateOrUpdateUser(ctx context.Context, email, provider, providerUserID string) (*model.User, error) {
-	// Try to find existing user first
+// Updated signature: now accepts name and avatarURL.
+func (r *UserRepository) CreateOrUpdateUser(ctx context.Context, email, provider, providerUserID, name, avatarURL string) (*model.User, error) {
+	fmt.Fprintf(os.Stderr, "Checking existing user with provider %s and providerUserID %s\n", provider, providerUserID)
 	existingUser, err := r.GetByProviderID(ctx, provider, providerUserID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("error checking existing user: %v", err)
 	}
-
+	fmt.Fprintf(os.Stderr, "Existing user: %v\n", existingUser)
 	if existingUser != nil {
-		// Update existing user if email has changed
-		if existingUser.Email != email {
+		// Update existing user if any fields have changed
+		if existingUser.Email != email || existingUser.Name != name || existingUser.AvatarURL != avatarURL {
 			query := `
 				UPDATE users 
-				SET email = $1, updated_at = CURRENT_TIMESTAMP
-				WHERE id = $2
-				RETURNING id, email, provider, provider_user_id, created_at, updated_at`
+				SET email = $1, name = $2, avatar_url = $3, updated_at = CURRENT_TIMESTAMP
+				WHERE id = $4
+				RETURNING id, email, provider, provider_user_id, name, avatar_url, created_at, updated_at`
 
-			err := r.db.QueryRow(ctx, query, email, existingUser.ID).Scan(
+			err := r.db.QueryRow(ctx, query, email, name, avatarURL, existingUser.ID).Scan(
 				&existingUser.ID,
 				&existingUser.Email,
 				&existingUser.Provider,
 				&existingUser.ProviderUserID,
+				&existingUser.Name,
+				&existingUser.AvatarURL,
 				&existingUser.CreatedAt,
 				&existingUser.UpdatedAt,
 			)
@@ -56,11 +60,13 @@ func (r *UserRepository) CreateOrUpdateUser(ctx context.Context, email, provider
 		Email:          email,
 		Provider:       provider,
 		ProviderUserID: providerUserID,
+		Name:           name,
+		AvatarURL:      avatarURL,
 	}
 
 	query := `
-		INSERT INTO users (id, email, provider, provider_user_id)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO users (id, email, provider, provider_user_id, name, avatar_url)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING created_at, updated_at`
 
 	err = r.db.QueryRow(ctx, query,
@@ -68,6 +74,8 @@ func (r *UserRepository) CreateOrUpdateUser(ctx context.Context, email, provider
 		user.Email,
 		user.Provider,
 		user.ProviderUserID,
+		user.Name,
+		user.AvatarURL,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
@@ -79,9 +87,11 @@ func (r *UserRepository) CreateOrUpdateUser(ctx context.Context, email, provider
 
 func (r *UserRepository) GetByProviderID(ctx context.Context, provider, providerUserID string) (*model.User, error) {
 	user := &model.User{}
-
+	fmt.Fprintf(os.Stderr, "Getting user with provider %s and providerUserID %s\n", provider, providerUserID)
 	query := `
-		SELECT id, email, provider, provider_user_id, created_at, updated_at
+		SELECT id, email, provider, provider_user_id,
+		       COALESCE(name, ''), COALESCE(avatar_url, ''),
+		       created_at, updated_at
 		FROM users
 		WHERE provider = $1 AND provider_user_id = $2`
 
@@ -90,11 +100,14 @@ func (r *UserRepository) GetByProviderID(ctx context.Context, provider, provider
 		&user.Email,
 		&user.Provider,
 		&user.ProviderUserID,
+		&user.Name,
+		&user.AvatarURL,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
 
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting user: %v\n", err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
@@ -108,7 +121,9 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 	user := &model.User{}
 
 	query := `
-		SELECT id, email, provider, provider_user_id, created_at, updated_at
+		SELECT id, email, provider, provider_user_id,
+		       COALESCE(name, ''), COALESCE(avatar_url, ''),
+		       created_at, updated_at
 		FROM users
 		WHERE id = $1`
 
@@ -117,6 +132,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 		&user.Email,
 		&user.Provider,
 		&user.ProviderUserID,
+		&user.Name,
+		&user.AvatarURL,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -135,7 +152,9 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 	user := &model.User{}
 
 	query := `
-		SELECT id, email, provider, provider_user_id, created_at, updated_at
+		SELECT id, email, provider, provider_user_id,
+		       COALESCE(name, ''), COALESCE(avatar_url, ''),
+		       created_at, updated_at
 		FROM users
 		WHERE email = $1`
 
@@ -144,6 +163,8 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 		&user.Email,
 		&user.Provider,
 		&user.ProviderUserID,
+		&user.Name,
+		&user.AvatarURL,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)

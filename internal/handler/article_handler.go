@@ -20,7 +20,7 @@ func NewArticleHandler(articleRepo repository.ArticleRepository, feedRepo reposi
 
 // GetFeedArticles returns all articles for a specific feed
 func (h *ArticleHandler) GetFeedArticles(c *fiber.Ctx) error {
-	feedID, err := uuid.Parse(c.Params("feedId"))
+	feedID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid feed ID")
 	}

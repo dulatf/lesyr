@@ -14,7 +14,7 @@ var (
 
 type UserRepository interface {
 	// CreateOrUpdateUser creates a new user or updates existing one from OAuth data
-	CreateOrUpdateUser(ctx context.Context, email, provider, providerUserID string) (*model.User, error)
+	CreateOrUpdateUser(ctx context.Context, email, provider, providerUserID, name, avatarURL string) (*model.User, error)
 
 	// GetByID retrieves a user by their internal ID
 	GetByID(ctx context.Context, id uuid.UUID) (*model.User, error)

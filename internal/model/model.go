@@ -11,6 +11,8 @@ type User struct {
 	Email          string    `json:"email"`
 	Provider       string    `json:"provider"`         // e.g., 'github', 'google'
 	ProviderUserID string    `json:"provider_user_id"` // ID from the OAuth provider
+	Name           string    `json:"name"`
+	AvatarURL      string    `json:"avatar_url"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }

@@ -123,6 +123,7 @@ func NewServer(cfg *config.Config) (*fiber.App, error) {
 	feeds.Get("/:id", feedHandler.GetFeed)
 	feeds.Delete("/:id", feedHandler.DeleteFeed)
 	feeds.Post("/:id/refresh", feedHandler.RefreshFeed)
+	feeds.Get("/:id/articles", articleHandler.GetFeedArticles)
 
 	// Article routes (protected)
 	articles := api.Group("/articles")
